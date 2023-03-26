@@ -13,7 +13,10 @@ import Voice from 'react-native-voice';
 import Tts from 'react-native-tts';
 import LanguageSelector from './components/LanguageSelector';
 import {openAIAPIKey as GPT_API_KEY} from './apiKeys';
+import { googleAPIKey as GOOGLE_API_KEY } from './apiKeys';
 import axios from 'axios';
+import RNFS from 'react-native-fs';
+import SoundPlayer from 'react-native-sound-player';
 
 
 
@@ -94,8 +97,14 @@ const App = () => {
     Voice.onSpeechEnd = onSpeechEnd;
     Voice.onSpeechResults = onSpeechResults;
     Voice.onSpeechError = onSpeechError;
-    Tts.setDefaultLanguage(lang);
+    if (lang === 'pl-PL') {
+      Tts.setDefaultEngine('com.google.android.tts');
+    } else {
+      Tts.setDefaultLanguage(lang);
+    }
   };
+  
+  
   const sendTextToChatGPT = async text => {
     try {
       const openaiURL = 'https://api.openai.com/v1/engines/text-davinci-002/completions';
@@ -127,21 +136,65 @@ const App = () => {
       }
     }
   };
+  const speakText = async (text, language) => {
+    if (language === 'pl-PL') {
+      const googleTtsResponse = await googleTtsSpeak(text, language);
+      const audioPath = `${RNFS.DocumentDirectoryPath}/tts.wav`;
+      await RNFS.writeFile(audioPath, googleTtsResponse, 'base64');
+      SoundPlayer.playSoundFile('tts', 'wav');
+    } else {
+      Tts.setDefaultLanguage(language);
+      Tts.speak(text);
+    }
+  };
   
-  const onSendToGPT = async () => {
+  
+  
+  
+  const onSendToGPT = async (language = selectedLanguage) => {
     if (transcription) {
       const chatGPTResponse = await sendTextToChatGPT(transcription);
       setResponseText(chatGPTResponse);
-      Tts.setDefaultLanguage(selectedLanguage); // Set the default language before speaking
-      Tts.speak(chatGPTResponse);
+     speakText(chatGPTResponse, language);
     } else {
-      console.log('Transcription is empty or null.');
+      console.log("Transcription is empty or null.");
     }
   };
+  
+  
+  
+  
+  
   
   const onStopTTS = () => {
     Tts.stop();
     setStopTTSButtonText('Audio Output Stopped');
+  };
+  
+  const googleTtsSpeak = async (text, language) => {
+    const url = `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${GOOGLE_API_KEY}`;
+    const requestBody = {
+      input: {
+        text: text,
+      },
+      voice: {
+        languageCode: language,
+        name: language === 'pl-PL' ? 'pl-PL-Wavenet-D' : 'en-US-Wavenet-A', // Specify the voice name
+      },
+      audioConfig: {
+        audioEncoding: 'LINEAR16',
+      },
+    };
+  
+    try {
+      const response = await axios.post(url, requestBody);
+      const base64Audio = response.data.audioContent;
+      const audioPath = `${RNFS.DocumentDirectoryPath}/tts.wav`;
+      await RNFS.writeFile(audioPath, base64Audio, 'base64');
+      SoundPlayer.playSoundFile('tts', 'wav');
+    } catch (error) {
+      console.error('Google TTS error:', error);
+    }
   };
   
   
