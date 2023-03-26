@@ -97,11 +97,9 @@ const App = () => {
     Tts.setDefaultLanguage(lang);
   };
   const sendTextToChatGPT = async text => {
-    
     try {
       const openaiURL = 'https://api.openai.com/v1/engines/text-davinci-002/completions';
       const prompt = `User: ${text}\nAI:`;
-      setSentPrompt(prompt); // Set the prompt to be sent to ChatGPT
       const response = await axios.post(
         openaiURL,
         {
@@ -122,9 +120,14 @@ const App = () => {
       console.log('ChatGPT Response:', chatGPTResponse);
       return chatGPTResponse;
     } catch (error) {
-      console.error('Error:', error);
+      if (error.response && error.response.status === 401) {
+        console.error('Error: Invalid API key or unauthorized access.');
+      } else {
+        console.error('Error:', error);
+      }
     }
   };
+  
   const onSendToGPT = async () => {
     if (transcription) {
       const chatGPTResponse = await sendTextToChatGPT(transcription);
