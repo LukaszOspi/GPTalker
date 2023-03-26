@@ -159,9 +159,6 @@ const App = () => {
         <View style={styles.responseContainer}>
           <Text>Transcription: {transcription}</Text>
         </View>
-        <View style={styles.sentPromptContainer}>
-      <Text>Sent Prompt: {sentPrompt}</Text>
-    </View>
         <View style={styles.chatGPTResponseContainer}>
         <Text>ChatGPT Response: {responseText}</Text>
       </View>
