@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,23 +10,19 @@ import {
   ScrollView,
 } from 'react-native';
 import Voice from 'react-native-voice';
+import axios from 'axios';
 import Tts from 'react-native-tts';
 import LanguageSelector from './components/LanguageSelector';
-import {openAIAPIKey as GPT_API_KEY} from './apiKeys';
-import axios from 'axios';
-
-
+import {googleAPIKey, openAIAPIKey} from './apiKeys';
+const OpenAI = require('openai');
 
 
 const App = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('en-UK');
-  const [stopTTSButtonText, setStopTTSButtonText] = useState('Stop Audio Output');
   const [responseText, setResponseText] = useState('');
-  const [sentPrompt, setSentPrompt] = useState('');
-
-
+  const [stopTTSButtonText, setStopTTSButtonText] = useState('Stop Audio Output');
+  const [selectedLanguage, setSelectedLanguage] = useState('en-UK');
 
   useEffect(() => {
     Voice.onSpeechStart = onSpeechStart;
@@ -34,26 +30,22 @@ const App = () => {
     Voice.onSpeechResults = onSpeechResults;
     Voice.onSpeechError = onSpeechError;
     Tts.setDefaultLanguage(selectedLanguage);
+  
 
     return () => {
       Voice.destroy().then(Voice.removeAllListeners);
     };
   }, [selectedLanguage]);
-  
-  useEffect(() => {
-    if (transcription) {
-      onSendToGPT();
-    }
-  }, [transcription]);
-  
 
   const onSpeechError = error => {
     console.error('Speech error:', error);
+    Tts.speak(`Speech recognition error: ${error.error.message}`);
     setIsRecording(false);
   };
 
   const onSpeechStart = () => {
     setIsRecording(true);
+    setResponseText('');
   };
 
   const onSpeechEnd = () => {
@@ -65,26 +57,59 @@ const App = () => {
       const text = event.value[0];
       console.log(`Transcription: ${text}`);
       setTranscription(text);
+      const chatGPTResponse = await sendTextToChatGPT(text);
+      setResponseText(chatGPTResponse);
+      Tts.speak(chatGPTResponse);
     }
   };
-  
 
   const startRecording = async () => {
     try {
-      setTranscription(''); // Clear transcription when starting a new recording
-      setResponseText(''); // Clear ChatGPT response when starting a new recording
       await Voice.start(selectedLanguage);
     } catch (error) {
       console.error('Error starting Voice:', error);
     }
   };
-  
+
   const stopRecording = async () => {
     try {
       await Voice.stop();
     } catch (error) {
       console.error('Error stopping Voice:', error);
     }
+  };
+  const sendTextToChatGPT = async text => {
+    try {
+      const prompt = `User: ${text}\nAI:`;
+      const openaiUrl = 'https://api.openai.com/v1/engines/text-davinci-002/completions';
+      const response = await axios.post(
+        openaiUrl,
+        {
+          prompt: prompt,
+          max_tokens: 500,
+          n: 1,
+          stop: null,
+          temperature: 0.5,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${openAIAPIKey}`,
+          },
+        },
+      );
+  
+      const chatGPTResponse = response.data.choices[0].text.trim();
+      console.log('ChatGPT Response:', chatGPTResponse);
+      return chatGPTResponse;
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+  
+
+  const onStopTTS = () => {
+    Tts.stop();
   };
 
   const changeLanguage = lang => {
@@ -96,59 +121,14 @@ const App = () => {
     Voice.onSpeechError = onSpeechError;
     Tts.setDefaultLanguage(lang);
   };
-  const sendTextToChatGPT = async text => {
-    
-    try {
-      const openaiURL = 'https://api.openai.com/v1/engines/text-davinci-002/completions';
-      const prompt = `User: ${text}\nAI:`;
-      setSentPrompt(prompt); // Set the prompt to be sent to ChatGPT
-      const response = await axios.post(
-        openaiURL,
-        {
-          prompt: prompt,
-          max_tokens: 500,
-          n: 1,
-          stop: null,
-          temperature: 0.5,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${GPT_API_KEY}`,
-          },
-        }
-      );
-      const chatGPTResponse = response.data.choices[0].text.trim();
-      console.log('ChatGPT Response:', chatGPTResponse);
-      return chatGPTResponse;
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-  const onSendToGPT = async () => {
-    if (transcription) {
-      const chatGPTResponse = await sendTextToChatGPT(transcription);
-      setResponseText(chatGPTResponse);
-      Tts.setDefaultLanguage(selectedLanguage); // Set the default language before speaking
-      Tts.speak(chatGPTResponse);
-    } else {
-      console.log('Transcription is empty or null.');
-    }
-  };
-  
-  const onStopTTS = () => {
-    Tts.stop();
-    setStopTTSButtonText('Audio Output Stopped');
-  };
-  
-  
-  
+
+
   return (
     <SafeAreaView style={styles.container}>
-      <LanguageSelector
-        selectedLanguage={selectedLanguage}
-        onSelectLanguage={changeLanguage}
-      />
+    <LanguageSelector
+      selectedLanguage={selectedLanguage}
+      onSelectLanguage={changeLanguage}
+    />
       <ScrollView contentContainerStyle={styles.innerContainer}>
         <TouchableOpacity
           onPressIn={startRecording}
@@ -158,18 +138,18 @@ const App = () => {
         </TouchableOpacity>
         <View style={styles.responseContainer}>
           <Text>Transcription: {transcription}</Text>
+          <Text>ChatGPT Response: {responseText}</Text>
         </View>
-        <View style={styles.sentPromptContainer}>
-      <Text>Sent Prompt: {sentPrompt}</Text>
-    </View>
-        <View style={styles.chatGPTResponseContainer}>
-        <Text>ChatGPT Response: {responseText}</Text>
-      </View>
-      <TouchableOpacity
-        onPress={onStopTTS}
-        style={styles.stopRecordingButton}>
-        <Text style={{color: 'white'}}>{stopTTSButtonText}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onStopTTS}
+          style={{
+            backgroundColor: 'red',
+            padding: 20,
+            borderRadius: 10,
+            marginTop: 20,
+          }}>
+          <Text style={{color: 'white'}}>{stopTTSButtonText}</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -203,20 +183,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 20,
   },
-  chatGPTResponseContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  stopRecordingButton: {
-    backgroundColor: 'red',
-          padding: 20,
-          borderRadius: 10,
-          marginTop: 20,
-  },
-  sentPromptContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
 });
 
 export default App;
+
+
