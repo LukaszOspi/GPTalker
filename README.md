@@ -2,7 +2,7 @@
 is a project by Ospi.
 Make chatGPT talk to you in different languages!
 
-Set up a chatGPT key in file apiKeys.js as 
+Set up a chatGPT key in file apiKeys.js in main folder ./ as 
 ```export const openAIAPIKey = 'your_key';```
 
 ## Run: 
