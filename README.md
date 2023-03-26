@@ -20,5 +20,7 @@ Open the terminal in your project's root directory and run the following command
 You will be able to find the .apk file here:
 android/app/build/outputs/apk/release/app-release.apk
 
+From there, you can transfer this file to your mobile device and install it there. Make sure you agree to all restrictions and warnings that might come as this app is not officially a Google Play App.
+
 ## Platform
 This app works now on Android. You would need to make some adjustments for creating this app for iOS.
