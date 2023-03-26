@@ -19,3 +19,6 @@ Open the terminal in your project's root directory and run the following command
 
 You will be able to find the .apk file here:
 android/app/build/outputs/apk/release/app-release.apk
+
+## Platform
+This app works now on Android. You would need to make some adjustments for creating this app for iOS.
