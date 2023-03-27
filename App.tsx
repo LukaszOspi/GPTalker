@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  LogBox,
 } from 'react-native';
 import Voice from 'react-native-voice';
 import Tts from 'react-native-tts';
@@ -18,6 +19,7 @@ import axios from 'axios';
 import RNFS from 'react-native-fs';
 import SoundPlayer from 'react-native-sound-player';
 
+LogBox.ignoreLogs(['Possible Unhandled Promise Rejection']);
 
 
 
@@ -27,10 +29,23 @@ const App = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en-UK');
   const [stopTTSButtonText, setStopTTSButtonText] = useState('Stop Audio Output');
   const [responseText, setResponseText] = useState('');
-  const [sentPrompt, setSentPrompt] = useState('');
+  const [ttsInitialized, setTtsInitialized] = useState(false);
+  console.disableYellowBox = true;
 
 
-
+  useEffect(() => {
+    const initTts = async () => {
+      try {
+        await Tts.getInitStatus();
+        setTtsInitialized(true);
+      } catch (err) {
+        console.warn('TTS initialization failed:', err);
+      }
+    };
+    initTts();
+  }, []);
+  
+  
   useEffect(() => {
     Voice.onSpeechStart = onSpeechStart;
     Voice.onSpeechEnd = onSpeechEnd;
@@ -90,19 +105,36 @@ const App = () => {
     }
   };
 
-  const changeLanguage = lang => {
+  const changeLanguage = async (lang) => {
+    if (!ttsInitialized) {
+      console.warn('TTS is not initialized yet');
+      return;
+    }
+    console.log('Selected language:', lang);
     setSelectedLanguage(lang);
     Voice.destroy().then(Voice.removeAllListeners);
     Voice.onSpeechStart = onSpeechStart;
     Voice.onSpeechEnd = onSpeechEnd;
     Voice.onSpeechResults = onSpeechResults;
     Voice.onSpeechError = onSpeechError;
+  
     if (lang === 'pl-PL') {
-      Tts.setDefaultEngine('com.google.android.tts');
+      try {
+        await Tts.setDefaultEngine('com.google.android.tts');
+        await Tts.setDefaultLanguage('pl-PL');
+      } catch (err) {
+        console.error('Error setting default engine and language for Polish:', err);
+      }
     } else {
-      Tts.setDefaultLanguage(lang);
+      try {
+        await Tts.setDefaultLanguage(lang);
+      } catch (err) {
+        console.error('Error setting default language:', err);
+      }
     }
   };
+  
+  
   
   
   const sendTextToChatGPT = async text => {
@@ -137,12 +169,16 @@ const App = () => {
     }
   };
   const speakText = async (text, language) => {
+    console.log('Speaking text:', text, 'Language:', language); // Add this line
+
     if (language === 'pl-PL') {
+      console.log('Using Google TTS for Polish'); // 
       const googleTtsResponse = await googleTtsSpeak(text, language);
       const audioPath = `${RNFS.DocumentDirectoryPath}/tts.wav`;
       await RNFS.writeFile(audioPath, googleTtsResponse, 'base64');
       SoundPlayer.playSoundFile('tts', 'wav');
     } else {
+      console.log('Using react-native-tts for other languages');
       Tts.setDefaultLanguage(language);
       Tts.speak(text);
     }
@@ -151,11 +187,12 @@ const App = () => {
   
   
   
+  
   const onSendToGPT = async (language = selectedLanguage) => {
     if (transcription) {
       const chatGPTResponse = await sendTextToChatGPT(transcription);
       setResponseText(chatGPTResponse);
-     speakText(chatGPTResponse, language);
+      speakText(chatGPTResponse, language);
     } else {
       console.log("Transcription is empty or null.");
     }
@@ -166,10 +203,16 @@ const App = () => {
   
   
   
+  
   const onStopTTS = () => {
     Tts.stop();
     setStopTTSButtonText('Audio Output Stopped');
+  
+    setTimeout(() => {
+      setStopTTSButtonText('Stop Audio Output'); // Reset button text
+    }, 1000);
   };
+  
   
   const googleTtsSpeak = async (text, language) => {
     const url = `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${GOOGLE_API_KEY}`;
@@ -242,6 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   recordButton: {
+    
     backgroundColor: 'blue',
     width: 100,
     height: 100,
@@ -268,6 +312,11 @@ const styles = StyleSheet.create({
   },
   sentPromptContainer: {
     marginTop: 20,
+    marginBottom: 20,
+  },
+  languageDisplay: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 20,
   },
 });

@@ -9,7 +9,7 @@ const LanguageSelector = ({selectedLanguage, onSelectLanguage}) => {
       style={{width: 150, height: 50}}>
       <Picker.Item label="ENG" value="en_GB" />
       <Picker.Item label="GER" value="de_DE" />
-      <Picker.Item label="POL" value="pl_PL" />
+      <Picker.Item label="POL" value="pl-PL" />
     </Picker>
   );
 };
